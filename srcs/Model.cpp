@@ -41,10 +41,24 @@ void Model::Draw(void)
 	};
 
 	multiplyMatrix(model, scaleMatrix, model);
-
 	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, model);
 
-	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+	size_t indexOffset = 0;
+	for (const Face& face : faces)
+	{
+		const auto it = materials.find(face.mtlname);
+		if (it != materials.end())
+		{
+			const Material& mat = it->second;
+			glUniform3f(glGetUniformLocation(shaderProgram, "material.diffuse"), mat.Kd.r, mat.Kd.g, mat.Kd.b);
+			glUniform3f(glGetUniformLocation(shaderProgram, "material.ambient"), mat.Ka.r, mat.Ka.g, mat.Ka.b);
+			glUniform3f(glGetUniformLocation(shaderProgram, "material.specular"), mat.Ks.r, mat.Ks.g, mat.Ks.b);
+			glUniform1f(glGetUniformLocation(shaderProgram, "material.shininess"), mat.Ns);
+		}
+		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void*)(indexOffset * sizeof(unsigned int)));
+		indexOffset += 3;
+	}
+	if (allIndices.size() % 3 != 0) std::cerr << "⚠️ Broken EBO!" << std::endl;
 	glBindVertexArray(0);
 }
 
@@ -84,16 +98,20 @@ void Model::LoadOBJ(const char* filePath)
 		{
 			std::string mtlFilename;
 			iss >> mtlFilename;
-			materials = MTLLoader::Load(mtlFilename);
+			materials = MTLLoader::Load("resources/" + mtlFilename);
 			std::cout << mtlFilename << std::endl;
 		}
-		if (prefix == "v")
+		else if (prefix == "v")
 		{
 			float x, y, z;
 			iss >> x >> y >> z;
 			temp_vertices.push_back(x);
 			temp_vertices.push_back(y);
 			temp_vertices.push_back(z);
+		}
+		else if (prefix == "usemtl")
+		{
+			iss >> currentMaterial;
 		}
 		else if (prefix == "f")
 		{
@@ -110,22 +128,26 @@ void Model::LoadOBJ(const char* filePath)
 			}
 			if (indices.size() == 3)
 			{
-				vertexIndices.push_back(indices[0]);
-				vertexIndices.push_back(indices[1]);
-				vertexIndices.push_back(indices[2]);
+				Face face;
+
+				face.mtlname = currentMaterial;
+				face.vertexIndices = indices;
+				faces.push_back(face);
 			}
 			// 사각형 (4개의 정점 → 삼각형 2개로 변환)
 			else if (indices.size() == 4)
 			{
-				// 첫 번째 삼각형
-				vertexIndices.push_back(indices[0]);
-				vertexIndices.push_back(indices[1]);
-				vertexIndices.push_back(indices[2]);
+				Face f1, f2;
 
+				// 첫 번째 삼각형
+				f1.mtlname = currentMaterial;
+				f1.vertexIndices = { indices[0], indices[1], indices[2] };
 				// 두 번째 삼각형
-				vertexIndices.push_back(indices[0]);
-				vertexIndices.push_back(indices[2]);
-				vertexIndices.push_back(indices[3]);
+				f2.mtlname = currentMaterial;
+				f2.vertexIndices = { indices[0], indices[2], indices[3] };
+
+				faces.push_back(f1);
+				faces.push_back(f2);
 			}
 		}
 	}
@@ -148,7 +170,12 @@ void Model::SetupMesh(void)
 	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+		// 각 face의 인덱스를 모아 하나의 인덱스 버퍼 생성
+	allIndices.clear();
+	for (const Face& face : faces) {
+		allIndices.insert(allIndices.end(), face.vertexIndices.begin(), face.vertexIndices.end());
+	}
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, allIndices.size() * sizeof(unsigned int), allIndices.data(), GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
@@ -191,4 +218,3 @@ void Model::NormalizeVertices(std::vector<float>& vertices)
 		vertices[i+2] = ((vertices[i+2] - centerZ) / maxRange) * 1.0f;
 	}
 }
-

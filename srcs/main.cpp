@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <OpenGL/gl.h>
 #include <iostream>
 #include "ShaderLoader.hpp"
 #include <math.h>
@@ -87,6 +88,9 @@ int main(void)
 	Model teapot("/Users/zinox/scop/resources/teapot2.obj", shaderProgram);
 
 	Versiondisplay();
+	// glEnable(GL_DEPTH_TEST);
+	glFrontFace(GL_CCW);
+	glDisable(GL_CULL_FACE);
 	while (!glfwWindowShouldClose(window))
 	{
 		glClearColor(0, 0, 0, 1);
