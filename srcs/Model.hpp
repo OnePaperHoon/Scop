@@ -10,6 +10,7 @@
 #include <float.h>
 #include "Material.hpp"
 #include "MathUtils.hpp"
+#include "Shader.hpp"
 
 struct Face {
 	std::vector<unsigned int> vertexIndices;
@@ -19,13 +20,14 @@ struct Face {
 class Model
 {
 	public:
-		Model(const char* filePath, GLuint shader);
+		Model(const char* filePath, Shader* shader);
 		~Model();
 
 		void Draw(void);
 		void SetScale(float scale);
 		void SetRotation(float rotX, float rotY);
-
+		void SetShader(Shader* shader);
+		void LoadTexture(const std::string& path);
 	private:
 		void LoadOBJ(const char* filePath);
 		void SetupMesh(void);
@@ -62,7 +64,8 @@ class Model
 		 * @brief
 		 * 이 모델이 사용하는 셰이더 프로그램 ID
 		 */
-		GLuint 						shaderProgram;
+		GLuint										mTextureId;
+		Shader*										mShaderProgram;
 		std::unordered_map<std::string, Material>	materials;
 		std::string									currentMaterial;
 

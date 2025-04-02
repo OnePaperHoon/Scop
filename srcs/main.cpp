@@ -2,12 +2,10 @@
 #include <GLFW/glfw3.h>
 #include <OpenGL/gl.h>
 #include <iostream>
-#include "ShaderLoader.hpp"
+#include "Shader.hpp"
 #include <math.h>
 #include "Model.hpp"
 #include "InputHandler.hpp"
-
-GLuint VBO, VAO;
 
 void Versiondisplay()
 {
@@ -54,7 +52,7 @@ GLFWwindow* CreateWindow(int width, int height, std::string title)
 
 int main(void)
 {
-	ShaderLoader shaderLoader;
+
 	InputHandler InputHandler;
 
 	if (initglfw())
@@ -74,35 +72,24 @@ int main(void)
 		glfwTerminate();
 		return (-1);
 	}
-
-	GLuint shaderProgram = shaderLoader.CompileShader(
-		"/Users/zinox/scop/srcs/shaders/shader_vert.glsl", // Vertex Shader
-		"/Users/zinox/scop/srcs/shaders/shader_frag.glsl"); // fragment Shader
-
-	if (shaderProgram)
-	{
-		std::cout << "Shader Program ID: " << shaderProgram << std::endl;
-		glUseProgram(shaderProgram);
-	}
-
-	Model teapot("/Users/zinox/scop/resources/teapot2.obj", shaderProgram);
+	Shader defaultShader (
+		"srcs/shaders/shader_vert.glsl", // Vertex Shader
+		"srcs/shaders/shader_frag.glsl"); // fragment Shader
+	defaultShader.PrintActiveUniforms();
+	Model teapot("resources/teapot2.obj", &defaultShader);
 
 	Versiondisplay();
-	// glEnable(GL_DEPTH_TEST);
-	glFrontFace(GL_CCW);
-	glDisable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
 	while (!glfwWindowShouldClose(window))
 	{
 		glClearColor(0, 0, 0, 1);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		teapot.SetRotation(InputHandler.GetRotX(), InputHandler.GetRotY());
 		teapot.SetScale(InputHandler.GetScale());
 		teapot.Draw();
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
-
-	glDeleteProgram(shaderProgram);
 	glfwTerminate();
 	return (0);
 }

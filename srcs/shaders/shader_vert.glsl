@@ -13,6 +13,5 @@ void main()
 	FragPos = worldPos.xyz;
 
 	Normal = normalize(mat3(model) * vec3(0.0, 0.0, 1.0));
-
 	gl_Position = worldPos;
 }

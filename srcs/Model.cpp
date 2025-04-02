@@ -1,8 +1,14 @@
+#define STB_IMAGE_IMPLEMENTATION
 #include "Model.hpp"
+#include <OpenGL/gl.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include "library/stb_image.h"
 #include "Material.hpp"
 
-Model::Model(const char* filePath, GLuint shader)
-: shaderProgram(shader)
+Model::Model(const char* filePath, Shader* shader)
+: mShaderProgram(shader)
 , scaleFactor(1.0f)
 , rotX(0.0f)
 , rotY(0.0f)
@@ -20,7 +26,7 @@ Model::~Model()
 
 void Model::Draw(void)
 {
-	glUseProgram(shaderProgram);
+	mShaderProgram->Use();
 	glBindVertexArray(VAO);
 
 	float model[16] = {
@@ -41,7 +47,7 @@ void Model::Draw(void)
 	};
 
 	multiplyMatrix(model, scaleMatrix, model);
-	glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, model);
+	mShaderProgram->SetMat4("model", model);
 
 	size_t indexOffset = 0;
 	for (const Face& face : faces)
@@ -50,14 +56,17 @@ void Model::Draw(void)
 		if (it != materials.end())
 		{
 			const Material& mat = it->second;
-			glUniform3f(glGetUniformLocation(shaderProgram, "material.diffuse"), mat.Kd.r, mat.Kd.g, mat.Kd.b);
-			glUniform3f(glGetUniformLocation(shaderProgram, "material.ambient"), mat.Ka.r, mat.Ka.g, mat.Ka.b);
-			glUniform3f(glGetUniformLocation(shaderProgram, "material.specular"), mat.Ks.r, mat.Ks.g, mat.Ks.b);
-			glUniform1f(glGetUniformLocation(shaderProgram, "material.shininess"), mat.Ns);
+			mShaderProgram->SetVec3("material.diffuse", mat.Kd.r, mat.Kd.g, mat.Kd.b);
+			mShaderProgram->SetVec3("material.ambient", mat.Ka.r, mat.Ka.g, mat.Ka.b);
+			mShaderProgram->SetVec3("material.specular", mat.Ks.r, mat.Ks.g, mat.Ks.b);
+			mShaderProgram->SetFloat("material.shininess", mat.Ns);
 		}
 		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void*)(indexOffset * sizeof(unsigned int)));
 		indexOffset += 3;
 	}
+	float timeValue = glfwGetTime();
+	float grrenValue = (sin(timeValue) / 2.0f + 0.5f);
+	mShaderProgram->SetVec4("TimeColor", 0.0f, grrenValue, 0.0f, 1.0f);
 	if (allIndices.size() % 3 != 0) std::cerr << "⚠️ Broken EBO!" << std::endl;
 	glBindVertexArray(0);
 }
@@ -72,6 +81,55 @@ void Model::SetRotation(float rotX, float rotY)
 {
 	this->rotX = rotX;
 	this->rotY = rotY;
+}
+
+void Model::SetShader(Shader* shader)
+{
+	this->mShaderProgram = shader;
+}
+
+void Model::LoadTexture(const std::string& path)
+{
+	glGenTextures(1, &mTextureId);
+
+	int width, height, channels;
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+
+	if (data)
+	{
+		GLenum format = GL_RGB;
+		if (channels == 1)
+			format = GL_RED;
+		else if (channels == 3)
+			format = GL_RGB;
+		else if (channels == 4)
+			format = GL_RGBA;
+
+		glBindTexture(GL_TEXTURE_2D, mTextureId);
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		stbi_image_free(data);
+	}
+	else
+	{
+		std::cerr << "Failed to load texture: " << path << " — using fallback texture." << std::endl;
+
+		unsigned char fallbackData[] = { 255, 0, 255, 255 }; // RGBA: magenta
+		glBindTexture(GL_TEXTURE_2D, mTextureId);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, fallbackData);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 }
 
 // Private
@@ -153,6 +211,7 @@ void Model::LoadOBJ(const char* filePath)
 	}
 	file.close();
 	NormalizeVertices(temp_vertices); // NDC 좌표계로
+
 	// 정점 및 인덱스 저장
 	vertices = temp_vertices;
 	indices = vertexIndices;

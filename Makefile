@@ -6,7 +6,7 @@ LDFLAGS			=		-framework OpenGL $(shell pkg-config --libs glfw3 glew) -arch arm64
 
 SRCS_DIR	= ./srcs/
 SRCS		=	main.cpp			\
-				ShaderLoader.cpp	\
+				Shader.cpp			\
 				Model.cpp			\
 				InputHandler.cpp	\
 				Material.cpp
