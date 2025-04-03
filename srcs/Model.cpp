@@ -1,3 +1,4 @@
+#include <_stdio.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include "Model.hpp"
 #include <OpenGL/gl.h>
@@ -12,9 +13,11 @@ Model::Model(const char* filePath, Shader* shader)
 , scaleFactor(1.0f)
 , rotX(0.0f)
 , rotY(0.0f)
+, hasTexCoord(false)
 {
 	LoadOBJ(filePath);
 	SetupMesh();
+	LoadTexture("resources/sample.png"); // TEST
 }
 
 Model::~Model()
@@ -141,9 +144,9 @@ void Model::LoadOBJ(const char* filePath)
 		std::cerr << "Failed to open OBJ file: " << filePath << std::endl;
 		return;
 	}
-
-	std::vector<float> temp_vertices;
-	std::vector<unsigned int> vertexIndices;
+	std::vector<Vec3> temp_V;
+	std::vector<Vec2> temp_Vt;
+	std::vector<Vec3> temp_Vn;
 
 	std::string line;
 	while (std::getline(file, line))
@@ -151,7 +154,7 @@ void Model::LoadOBJ(const char* filePath)
 		std::istringstream iss(line);
 		std::string prefix;
 		iss >> prefix;
-
+		// mtl 파일 파싱
 		if (prefix == "mtllib")
 		{
 			std::string mtlFilename;
@@ -159,50 +162,95 @@ void Model::LoadOBJ(const char* filePath)
 			materials = MTLLoader::Load("resources/" + mtlFilename);
 			std::cout << mtlFilename << std::endl;
 		}
-		else if (prefix == "v")
+		else if (prefix == "v") // v 1.0123, 2.123123, -6.1235 -> 정점 좌표 정보일 경우
 		{
-			float x, y, z;
-			iss >> x >> y >> z;
-			temp_vertices.push_back(x);
-			temp_vertices.push_back(y);
-			temp_vertices.push_back(z);
+			Vec3 v;
+			iss >> v.x >> v.y >> v.z;
+			temp_V.push_back(v);
 		}
-		else if (prefix == "usemtl")
+		else if (prefix == "vt") // vt 0~1, 0~1 -> TextureCoord일 경우
+		{
+			Vec2 vt;
+			iss >> vt.x >> vt.y;
+			temp_Vt.push_back(vt);
+			hasTexCoord = true;
+		}
+		else if (prefix == "vn") // vn 1, 2, 5 -> Normal 정보일 경우
+		{
+			Vec3 vn;
+			iss >> vn.x >> vn.y >> vn.z;
+			temp_Vn.push_back(vn);
+		}
+		else if (prefix == "usemtl") // v, vn, vt 정보가 모두 처리 완료 된 후 Usemtl -> 이후 f들에게 적용할 mtl 명
 		{
 			iss >> currentMaterial;
 		}
-		else if (prefix == "f")
+		else if (prefix == "f") // f 정보가 나오면
 		{
-			std::vector<unsigned int> indices;
-			std::string vertex;
+			Face face;
+			face.mtlname = currentMaterial;
+			std::string vertexStr;
 
-			// f 라인의 모든 숫자 읽기
-			while (iss >> vertex)
+			static std::unordered_map<std::string, unsigned int> vertexCache;
+
+			while (iss >> vertexStr)
 			{
-				int vIndex;
-				std::istringstream vss(vertex);
-				vss >> vIndex;
-				indices.push_back(vIndex - 1); // OBJ 인덱스는 1부터 시작 (-1)
+				std::cout << vertexStr << std::endl;
+				if (vertexCache.count(vertexStr))
+				{
+					face.vertexIndices.push_back(vertexCache[vertexStr]);
+					continue;
+				}
+
+				int vIdx = -1, vtIdx = -1, vnIdx = -1;
+				size_t firstSlash = vertexStr.find('/'); // f 1/2/3 에서 첫번째 슬레쉬 찾기
+				size_t secondSlash = vertexStr.find('/', firstSlash + 1); // 두번째 슬레쉬 찾기
+
+				if (firstSlash == std::string::npos)
+				{
+					vIdx = std::stoi(vertexStr) - 1;
+				}
+				else if (secondSlash == std::string::npos)
+				{
+					vIdx = std::stoi(vertexStr.substr(0, firstSlash)) - 1;
+					vtIdx = std::stoi(vertexStr.substr(firstSlash + 1)) - 1;
+				}
+				else if (secondSlash == firstSlash + 1)
+				{
+					vIdx = std::stoi(vertexStr.substr(0, firstSlash)) - 1;
+					vnIdx = std::stoi(vertexStr.substr(secondSlash + 1)) - 1;
+				}
+				else
+				{
+					vIdx = std::stoi(vertexStr.substr(0, firstSlash)) - 1;
+					vtIdx = std::stoi(vertexStr.substr(firstSlash + 1, secondSlash - firstSlash - 1)) - 1;
+					vnIdx = std::stoi(vertexStr.substr(secondSlash + 1)) - 1;
+				}
+
+				Vertex v;
+				v.position = temp_V[vIdx];
+				if (vtIdx >= 0 && temp_Vt.size() != 0)
+					v.texCoord = temp_Vt[vtIdx];
+				if (vnIdx >= 0 && temp_Vn.size() != 0)
+					v.normal = temp_Vn[vnIdx];
+
+				vertices.push_back(v);
+				unsigned int index = vertices.size() - 1;
+				vertexCache[vertexStr] = index;
+				face.vertexIndices.push_back(index);
 			}
-			if (indices.size() == 3)
+			if (face.vertexIndices.size() == 3)
 			{
-				Face face;
-
-				face.mtlname = currentMaterial;
-				face.vertexIndices = indices;
 				faces.push_back(face);
 			}
-			// 사각형 (4개의 정점 → 삼각형 2개로 변환)
-			else if (indices.size() == 4)
+			else if (face.vertexIndices.size() == 4)
 			{
 				Face f1, f2;
+				f1.mtlname = face.mtlname;
+				f1.vertexIndices = { face.vertexIndices[0], face.vertexIndices[1], face.vertexIndices[2] };
 
-				// 첫 번째 삼각형
-				f1.mtlname = currentMaterial;
-				f1.vertexIndices = { indices[0], indices[1], indices[2] };
-				// 두 번째 삼각형
-				f2.mtlname = currentMaterial;
-				f2.vertexIndices = { indices[0], indices[2], indices[3] };
+				f2.mtlname = face.mtlname;
+				f2.vertexIndices = { face.vertexIndices[0], face.vertexIndices[2], face.vertexIndices[3] };
 
 				faces.push_back(f1);
 				faces.push_back(f2);
@@ -210,11 +258,14 @@ void Model::LoadOBJ(const char* filePath)
 		}
 	}
 	file.close();
-	NormalizeVertices(temp_vertices); // NDC 좌표계로
-
+	NormalizeVertices(vertices); // NDC 좌표계로
+	if (!hasTexCoord)
+	{
+		GenerateTexCoordsFromPosition();
+	}
+	PrintAllVertexInfo();
+	// PrintAllFaceInfo();
 	// 정점 및 인덱스 저장
-	vertices = temp_vertices;
-	indices = vertexIndices;
 }
 
 void Model::SetupMesh(void)
@@ -226,8 +277,13 @@ void Model::SetupMesh(void)
 	glBindVertexArray(VAO);
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
-
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+	/*
+		Vertex
+		->	float * 3 : position
+			float * 3 : normal
+			float * 2 : texcoord
+	*/
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 		// 각 face의 인덱스를 모아 하나의 인덱스 버퍼 생성
 	allIndices.clear();
@@ -236,44 +292,85 @@ void Model::SetupMesh(void)
 	}
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, allIndices.size() * sizeof(unsigned int), allIndices.data(), GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
 	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+	glEnableVertexAttribArray(2);
 
 	glBindVertexArray(0);
 }
 
-void Model::NormalizeVertices(std::vector<float>& vertices)
+void Model::NormalizeVertices(std::vector<Vertex>& vertices)
 {
 	float minX = FLT_MAX, minY = FLT_MAX, minZ = FLT_MAX;
 	float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
 
-	// 모델의 최소/최대 좌표 찾기
-	for (size_t i = 0; i < vertices.size(); i += 3)
+	// 1. 최소/최대 좌표 계산
+	for (const auto& v : vertices)
 	{
-		minX = std::min(minX, vertices[i]);
-		minY = std::min(minY, vertices[i + 1]);
-		minZ = std::min(minZ, vertices[i + 2]);
+		minX = std::min(minX, v.position.x);
+		minY = std::min(minY, v.position.y);
+		minZ = std::min(minZ, v.position.z);
 
-		maxX = std::max(maxX, vertices[i]);
-		maxY = std::max(maxY, vertices[i + 1]);
-		maxZ = std::max(maxZ, vertices[i + 2]);
+		maxX = std::max(maxX, v.position.x);
+		maxY = std::max(maxY, v.position.y);
+		maxZ = std::max(maxZ, v.position.z);
 	}
 
-	// 모델의 최대 크기 구하기 (가장 긴 축을 기준으로 정규화)
-	float rangeX = maxX - minX;
-	float rangeY = maxY - minY;
-	float rangeZ = maxZ - minZ;
-	float maxRange = std::max(rangeX, std::max(rangeY, rangeZ));  // 가장 긴 축 찾기
-
+	// 2. 중심 및 최대 범위 계산
 	float centerX = (maxX + minX) / 2.0f;
 	float centerY = (maxY + minY) / 2.0f;
 	float centerZ = (maxZ + minZ) / 2.0f;
+	float maxRange = std::max({ maxX - minX, maxY - minY, maxZ - minZ });
 
-	// 모델을 중심으로 이동 후, 비율 유지하면서 `-1 ~ 1` 정규화
-	for (size_t i = 0; i < vertices.size(); i += 3)
+	// 3. 정규화 (NDC 범위 맞춤)
+	for (auto& v : vertices)
 	{
-		vertices[i]   = ((vertices[i]   - centerX) / maxRange) * 1.0f;
-		vertices[i+1] = ((vertices[i+1] - centerY) / maxRange) * 1.0f;
-		vertices[i+2] = ((vertices[i+2] - centerZ) / maxRange) * 1.0f;
+		v.position.x = (v.position.x - centerX) / maxRange;
+		v.position.y = (v.position.y - centerY) / maxRange;
+		v.position.z = (v.position.z - centerZ) / maxRange;
+	}
+}
+
+void Model::GenerateTexCoordsFromPosition(void)
+{
+	std::cout << "🌀 No texCoord found — Generating UVs from position.\n";
+
+	for (size_t i = 0; i < vertices.size(); ++i)
+	{
+		vertices[i].texCoord.x = (vertices[i].position.x + 1.0f) * 0.5f;
+		vertices[i].texCoord.y = (vertices[i].position.y + 1.0f) * 0.5f;
+	}
+}
+
+
+/* ----------------TEST---------------- */
+void Model::PrintAllVertexInfo()
+{
+	std::vector<Vertex>::const_iterator it = vertices.begin();
+	for (; it != vertices.end(); it++)
+	{
+		std::cout << "-----------------Vertices Info---------------" << std::endl;
+		std::cout << "postiton| x : " << it->position.x << " y : "<< it->position.y << " z : " << it->position.z << std::endl;
+		std::cout << "normal  | x : " << it->normal.x << " y : " << it->normal.y << " z : " <<  it->normal.z <<std::endl;
+		std::cout << "texCoord| x : " << it->texCoord.x << " y : " << it->texCoord.y <<std::endl;
+	}
+}
+
+void Model::PrintAllFaceInfo()
+{
+	std::vector<Face>::const_iterator it = faces.begin();
+	for (; it != faces.end(); it++)
+	{
+		std::cout << "----------------Face Info-----------------" << std::endl;
+		std::cout << "vertexIndces: ";
+		for (std::vector<unsigned int>::const_iterator index = it->vertexIndices.begin(); index != it->vertexIndices.end(); index++)
+		{
+			std::cout << *index << " ";
+		}
+		std::cout << std::endl;
+		std::cout << "mtlName : " << it->mtlname << std::endl;
 	}
 }
