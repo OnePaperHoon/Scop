@@ -1,5 +1,4 @@
 #include "Material.hpp"
-#include <codecvt>
 #include <string>
 #include <unordered_map>
 #include <fstream>

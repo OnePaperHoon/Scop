@@ -75,18 +75,21 @@ int main(void)
 	Shader defaultShader (
 		"srcs/shaders/shader_vert.glsl", // Vertex Shader
 		"srcs/shaders/shader_frag.glsl"); // fragment Shader
-	defaultShader.PrintActiveUniforms();
 	Model teapot("resources/teapot2.obj", &defaultShader);
-
+	Model teapot2("resources/teapot2.obj", &defaultShader);
+	teapot2.SetTranslation(-1, 1, -2);
 	Versiondisplay();
 	glEnable(GL_DEPTH_TEST);
 	while (!glfwWindowShouldClose(window))
 	{
-		glClearColor(0, 0, 0, 1);
+		glClearColor(0.5, 0.5, 0.5, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		teapot.SetRotation(InputHandler.GetRotX(), InputHandler.GetRotY());
 		teapot.SetScale(InputHandler.GetScale());
+		teapot.SetRotation(InputHandler.GetRotX(), InputHandler.GetRotY());
+		teapot.SetTranslation(InputHandler.GetVelocityX(), InputHandler.GetVelocityY(), InputHandler.GetVelocityZ());
+		teapot.UseTexture(InputHandler.GetUseTexture());
 		teapot.Draw();
+		teapot2.Draw();
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}

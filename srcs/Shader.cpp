@@ -39,8 +39,8 @@ void	Shader::SetBool(const std::string& name, bool value) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniform1i(location, (int)value);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetInt(const std::string& name, int value) const
@@ -48,8 +48,8 @@ void	Shader::SetInt(const std::string& name, int value) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniform1i(location, value);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetFloat(const std::string& name, float value) const
@@ -57,8 +57,8 @@ void	Shader::SetFloat(const std::string& name, float value) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniform1f(location, value);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetVec2(const std::string& name, float x, float y) const
@@ -66,8 +66,8 @@ void	Shader::SetVec2(const std::string& name, float x, float y) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniform2f(location, x, y);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetVec3(const std::string& name, float x, float y, float z) const
@@ -75,8 +75,8 @@ void	Shader::SetVec3(const std::string& name, float x, float y, float z) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniform3f(location, x, y, z);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetVec4(const std::string& name, float x, float y, float z, float w) const
@@ -84,8 +84,8 @@ void	Shader::SetVec4(const std::string& name, float x, float y, float z, float w
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniform4f(location, x, y, z, w);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetMat3(const std::string& name, const float* value) const
@@ -93,8 +93,8 @@ void	Shader::SetMat3(const std::string& name, const float* value) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniformMatrix3fv(location, 1, GL_FALSE, value);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 void	Shader::SetMat4(const std::string& name, const float* value) const
@@ -102,8 +102,8 @@ void	Shader::SetMat4(const std::string& name, const float* value) const
 	GLint location = GetLocation(name);
 	if (location != -1)
 		glUniformMatrix4fv(location, 1, GL_FALSE, value);
-	else
-		std::cerr << "Not Found : " << name << " Uniform" << std::endl;
+	// else
+	// 	std::cerr << "Not Found : " << name << " Uniform" << std::endl;
 }
 
 /* Public Utils */
@@ -134,7 +134,7 @@ void Shader::PrintActiveUniforms() const {
 	GLint count;
 	glGetProgramiv(mProgramId, GL_ACTIVE_UNIFORMS, &count);
 
-	std::cout << "Active Uniforms in Shader Program " << mProgramId << ":" << std::endl;
+	std::cout << "Active Uniforms in Shader Program " << ": " << mProgramId <<  std::endl;
 
 	for (int i = 0; i < count; ++i) {
 		GLchar name[256];
@@ -248,5 +248,6 @@ void Shader::LoadActiveUniforms()
 
 		GLint loaction = glGetUniformLocation(mProgramId, name);
 		mUniformLocations[name] = loaction;
+		std::cout << "Uniforms Name: " << name << std::endl;
 	}
 }

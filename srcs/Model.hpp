@@ -8,39 +8,23 @@
 #include <fstream>
 #include <iostream>
 #include <float.h>
-#include "Material.hpp"
 #include "MathUtils.hpp"
+#include "Material.hpp"
 #include "Shader.hpp"
-
-struct Vec3 {
-	float x, y, z;
-
-	bool operator==(const Vec3& other) const {
-		return x == other.x && y == other.y && z == other.z;
-	}
-};
-
-struct Vec2 {
-	float x, y;
-
-	bool operator==(const Vec2& other) const {
-		return x == other.x && y == other.y;
-	}
-};
 
 struct Vertex {
 	Vec3 position;
 	Vec3 normal = { 0.0f, 0.0f, 0.0f };
 	Vec2 texCoord = { 0.0f, 0.0f };
-
+	Vec3 color = { 0.0f, 0.0f, 0.0f};
 	bool operator==(const Vertex& other ) const {
 		return	position == other.position &&
 				normal == other.normal &&
 				texCoord == other.texCoord;
 	}
 };
-
 struct Face {
+
 	std::vector<unsigned int> vertexIndices;
 	std::string mtlname;
 };
@@ -53,17 +37,21 @@ class Model
 
 	public: // public Function
 		void Draw(void);
+		void SetShader(Shader* shader);
+		void UseTexture(bool value);
+		void LoadTexture(const std::string& path);
 		void SetScale(float scale);
 		void SetRotation(float rotX, float rotY);
-		void SetShader(Shader* shader);
-		void LoadTexture(const std::string& path);
+		void SetTranslation(float offsetX, float offsetY, float offsetZ);
 
-	private: // Private Function
+		private: // Private Function
 		void LoadOBJ(const char* filePath);
 		void SetupMesh(void);
 		void NormalizeVertices(std::vector<Vertex>& vertices);
 		void ComputeNormals(void);
 		void GenerateTexCoordsFromPosition(void);
+		void ApplyFaceColorsFromIndex(void);
+		void UpdateBlend(bool toTexture, float deltaTime);
 	private: // Variable
 		/**
 		 * @brief
@@ -72,38 +60,40 @@ class Model
 		 * Vec3 Normal
 		 * Vec2 TextureCoord
 		 */
-		std::vector<Vertex> vertices;
+		std::vector<Vertex> mVertices;
 		/**
 		 * @brief
 		 * 현재 3D 모델의 요소 인덱스 정보 (EBO에 사용됨)
 		 */
-		std::vector<unsigned int>	allIndices;
-		std::vector<Face>			faces;
+		std::vector<unsigned int>	mAllIndices;
+		std::vector<Face>			mFaces;
 		/**
 		 * @brief
 		 * 모델 스케일을 조절하는 비율 값
 		 */
-		float						scaleFactor;
+		float						mScaleFactor;
 		/**
 		 * @brief
 		 * 모델 회전을 조절하는 값
 		 */
-		float						rotX, rotY;
+		float						mRotX, mRotY;
 		/**
 		 * @brief
-		 * OpenGL 객체 식별자: VAO, VBO, EBO, 색상 VBO
+		 * 현재 오브젝트의 x, y, z 좌표
 		 */
-		GLuint 						VAO, VBO, EBO, colorVBO;
+		float						mPosX, mPosY, mPosZ;
 		/**
 		 * @brief
-		 * 이 모델이 사용하는 셰이더 프로그램 ID
+		 * OpenGL 객체 식별자: VAO, VBO, EBO
 		 */
-		GLuint										mTextureId;			// 현재 오브젝트에 대한 Texture ID
-		Shader*										mShaderProgram;		// 현재 오브젝트에 대한 Shader Program ID
-		std::unordered_map<std::string, Material>	materials;			// usemtl이 여러개일 경우를 상정하여 Material node_map
-		std::string									currentMaterial;	// LoadOBJ & Draw 에서 currentMaterial 조정
-		bool										hasTexCoord;
+		GLuint 						mVAO, mVBO, mEBO;
 
+		Shader*										mShaderProgram;		// 현재 오브젝트에 대한 Shader Program ID
+		GLuint										mTextureId;			// 현재 오브젝트에 대한 Texture ID
+		std::unordered_map<std::string, Material>	mMaterials;			// usemtl이 여러개일 경우를 상정하여 Material node_map
+		std::string									mCurrentMaterial;	// LoadOBJ & Draw 에서 currentMaterial 조정
+		bool										mbUseTexture;		// 'T' 키에 대한 텍스쳐 모드 여부
+		float										mBlendFactor;
 	private: // TEST PRINT INFO
 		void PrintAllVertexInfo();
 		void PrintAllFaceInfo();

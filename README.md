@@ -48,6 +48,7 @@ This project is entirely built **without external math or model libraries** (no 
 | `Q / E`     | Move object (Z axis)            |
 | `R`         | Reset object position           |
 | `T`         | Toggle between texture / color  |
+| `1`         | Change View Option (Wire / Fill)|
 | `ESC`       | Quit the application            |
 
 ---
@@ -59,7 +60,5 @@ make
 ./scop models/teapot.obj
 ```
 ___
-
-
 
 # 📁 Project Structure

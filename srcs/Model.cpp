@@ -1,19 +1,21 @@
-#include <_stdio.h>
+#include "MathUtils.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "Model.hpp"
+#include "library/stb_image.h"
 #include <OpenGL/gl.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include "library/stb_image.h"
 #include "Material.hpp"
+
 
 Model::Model(const char* filePath, Shader* shader)
 : mShaderProgram(shader)
-, scaleFactor(1.0f)
-, rotX(0.0f)
-, rotY(0.0f)
-, hasTexCoord(false)
+, mScaleFactor(1.0f)
+, mRotX(0.0f), mRotY(0.0f)
+, mPosX(0.0f), mPosY(0.0f), mPosZ(0.0f)
+, mbUseTexture(false)
+, mBlendFactor(0.0f)
 {
 	LoadOBJ(filePath);
 	SetupMesh();
@@ -22,41 +24,51 @@ Model::Model(const char* filePath, Shader* shader)
 
 Model::~Model()
 {
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
+	glDeleteVertexArrays(1, &mVAO);
+	glDeleteBuffers(1, &mVBO);
+	glDeleteBuffers(1, &mEBO);
 }
 
 void Model::Draw(void)
 {
 	mShaderProgram->Use();
-	glBindVertexArray(VAO);
+	glBindVertexArray(mVAO);
 
-	float model[16] = {
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1
-	};
+	float view[16];
+	createLookAtMatrix({0, 0, 3}, {0, 0, 0}, {0, 1, 0}, view);
 
-	rotateY(rotY, model);
-	rotateX(rotX, model);
+	float projection[16];
+	createPerspectiveMatrix(45.0f, 1000.0f/1000.0f, 0.1f, 100.0f, projection);
+
+	float model[16];
+	setIdentityMatrix(model);
 
 	float scaleMatrix[16] = {
-		scaleFactor, 0.0f, 0.0f, 0.0f,
-		0.0f, scaleFactor, 0.0f, 0.0f,
-		0.0f, 0.0f, scaleFactor, 0.0f,
+		mScaleFactor, 0.0f, 0.0f, 0.0f,
+		0.0f, mScaleFactor, 0.0f, 0.0f,
+		0.0f, 0.0f, mScaleFactor, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
+	float translate[16];
+	createTranslationMatrix(mPosX, mPosY, mPosZ, translate);
 
 	multiplyMatrix(model, scaleMatrix, model);
-	mShaderProgram->SetMat4("model", model);
+	rotateY(mRotY, model);
+	rotateX(mRotX, model);
+	multiplyMatrix(model, translate, model);
 
+	UpdateBlend(mbUseTexture, 0.016f);
+
+	mShaderProgram->SetMat4("model", model);
+	// mShaderProgram->SetBool("useTexture",mbUseTexture);
+	mShaderProgram->SetMat4("view", view);
+	mShaderProgram->SetMat4("projection", projection);
+	mShaderProgram->SetFloat("blendFactor", mBlendFactor);
 	size_t indexOffset = 0;
-	for (const Face& face : faces)
+	for (const Face& face : mFaces)
 	{
-		const auto it = materials.find(face.mtlname);
-		if (it != materials.end())
+		const auto it = mMaterials.find(face.mtlname);
+		if (it != mMaterials.end())
 		{
 			const Material& mat = it->second;
 			mShaderProgram->SetVec3("material.diffuse", mat.Kd.r, mat.Kd.g, mat.Kd.b);
@@ -67,28 +79,18 @@ void Model::Draw(void)
 		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void*)(indexOffset * sizeof(unsigned int)));
 		indexOffset += 3;
 	}
-	float timeValue = glfwGetTime();
-	float grrenValue = (sin(timeValue) / 2.0f + 0.5f);
-	mShaderProgram->SetVec4("TimeColor", 0.0f, grrenValue, 0.0f, 1.0f);
-	if (allIndices.size() % 3 != 0) std::cerr << "⚠️ Broken EBO!" << std::endl;
+	if (mAllIndices.size() % 3 != 0) std::cerr << "⚠️ Broken EBO!" << std::endl;
 	glBindVertexArray(0);
-}
-
-void Model::SetScale(float scale) {
-	if (scale != scaleFactor)
-		std::cout << "Before Scale: " << scaleFactor << " After Scale: " << scale << std::endl;
-	this->scaleFactor = scale;
-}
-
-void Model::SetRotation(float rotX, float rotY)
-{
-	this->rotX = rotX;
-	this->rotY = rotY;
 }
 
 void Model::SetShader(Shader* shader)
 {
 	this->mShaderProgram = shader;
+}
+
+void Model::UseTexture(bool Value)
+{
+	this->mbUseTexture = Value;
 }
 
 void Model::LoadTexture(const std::string& path)
@@ -135,6 +137,25 @@ void Model::LoadTexture(const std::string& path)
 	}
 }
 
+void Model::SetScale(float scale) {
+	if (scale != mScaleFactor)
+		std::cout << "Before Scale: " << mScaleFactor << " After Scale: " << scale << std::endl;
+	this->mScaleFactor = scale;
+}
+
+void Model::SetRotation(float rotX, float rotY)
+{
+	this->mRotX = rotX;
+	this->mRotY = rotY;
+}
+
+void Model::SetTranslation(float offsetX, float offsetY, float offsetZ)
+{
+	mPosX += offsetX;
+	mPosY += offsetY;
+	mPosZ += offsetZ;
+}
+
 // Private
 void Model::LoadOBJ(const char* filePath)
 {
@@ -144,9 +165,11 @@ void Model::LoadOBJ(const char* filePath)
 		std::cerr << "Failed to open OBJ file: " << filePath << std::endl;
 		return;
 	}
-	std::vector<Vec3> temp_V;
-	std::vector<Vec2> temp_Vt;
-	std::vector<Vec3> temp_Vn;
+	std::vector<Vec3>	temp_V;
+	std::vector<Vec2>	temp_Vt;
+	std::vector<Vec3>	temp_Vn;
+	std::vector<Vec3>	temp_color;
+	bool				hasTexCoord;
 
 	std::string line;
 	while (std::getline(file, line))
@@ -159,12 +182,13 @@ void Model::LoadOBJ(const char* filePath)
 		{
 			std::string mtlFilename;
 			iss >> mtlFilename;
-			materials = MTLLoader::Load("resources/" + mtlFilename);
+			mMaterials = MTLLoader::Load("resources/" + mtlFilename);
 			std::cout << mtlFilename << std::endl;
 		}
 		else if (prefix == "v") // v 1.0123, 2.123123, -6.1235 -> 정점 좌표 정보일 경우
 		{
 			Vec3 v;
+
 			iss >> v.x >> v.y >> v.z;
 			temp_V.push_back(v);
 		}
@@ -183,25 +207,15 @@ void Model::LoadOBJ(const char* filePath)
 		}
 		else if (prefix == "usemtl") // v, vn, vt 정보가 모두 처리 완료 된 후 Usemtl -> 이후 f들에게 적용할 mtl 명
 		{
-			iss >> currentMaterial;
+			iss >> mCurrentMaterial;
 		}
 		else if (prefix == "f") // f 정보가 나오면
 		{
 			Face face;
-			face.mtlname = currentMaterial;
+			face.mtlname = mCurrentMaterial;
 			std::string vertexStr;
-
-			static std::unordered_map<std::string, unsigned int> vertexCache;
-
 			while (iss >> vertexStr)
 			{
-				std::cout << vertexStr << std::endl;
-				if (vertexCache.count(vertexStr))
-				{
-					face.vertexIndices.push_back(vertexCache[vertexStr]);
-					continue;
-				}
-
 				int vIdx = -1, vtIdx = -1, vnIdx = -1;
 				size_t firstSlash = vertexStr.find('/'); // f 1/2/3 에서 첫번째 슬레쉬 찾기
 				size_t secondSlash = vertexStr.find('/', firstSlash + 1); // 두번째 슬레쉬 찾기
@@ -234,14 +248,13 @@ void Model::LoadOBJ(const char* filePath)
 				if (vnIdx >= 0 && temp_Vn.size() != 0)
 					v.normal = temp_Vn[vnIdx];
 
-				vertices.push_back(v);
-				unsigned int index = vertices.size() - 1;
-				vertexCache[vertexStr] = index;
+				mVertices.push_back(v);
+				unsigned int index = mVertices.size() - 1;
 				face.vertexIndices.push_back(index);
 			}
 			if (face.vertexIndices.size() == 3)
 			{
-				faces.push_back(face);
+				mFaces.push_back(face);
 			}
 			else if (face.vertexIndices.size() == 4)
 			{
@@ -252,17 +265,18 @@ void Model::LoadOBJ(const char* filePath)
 				f2.mtlname = face.mtlname;
 				f2.vertexIndices = { face.vertexIndices[0], face.vertexIndices[2], face.vertexIndices[3] };
 
-				faces.push_back(f1);
-				faces.push_back(f2);
+				mFaces.push_back(f1);
+				mFaces.push_back(f2);
 			}
 		}
 	}
 	file.close();
-	NormalizeVertices(vertices); // NDC 좌표계로
 	if (!hasTexCoord)
 	{
 		GenerateTexCoordsFromPosition();
 	}
+	NormalizeVertices(mVertices); // NDC 좌표계로
+	ApplyFaceColorsFromIndex();
 	PrintAllVertexInfo();
 	// PrintAllFaceInfo();
 	// 정점 및 인덱스 저장
@@ -270,27 +284,28 @@ void Model::LoadOBJ(const char* filePath)
 
 void Model::SetupMesh(void)
 {
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
+	glGenVertexArrays(1, &mVAO);
+	glGenBuffers(1, &mVBO);
+	glGenBuffers(1, &mEBO);
 
-	glBindVertexArray(VAO);
+	glBindVertexArray(mVAO);
 
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+	glBufferData(GL_ARRAY_BUFFER, mVertices.size() * sizeof(Vertex), &mVertices[0], GL_STATIC_DRAW);
 	/*
 		Vertex
 		->	float * 3 : position
 			float * 3 : normal
 			float * 2 : texcoord
+			flaot * 3 : color
 	*/
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBO);
 		// 각 face의 인덱스를 모아 하나의 인덱스 버퍼 생성
-	allIndices.clear();
-	for (const Face& face : faces) {
-		allIndices.insert(allIndices.end(), face.vertexIndices.begin(), face.vertexIndices.end());
+	mAllIndices.clear();
+	for (const Face& face : mFaces) {
+		mAllIndices.insert(mAllIndices.end(), face.vertexIndices.begin(), face.vertexIndices.end());
 	}
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, allIndices.size() * sizeof(unsigned int), allIndices.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mAllIndices.size() * sizeof(unsigned int), mAllIndices.data(), GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
 	glEnableVertexAttribArray(0);
@@ -298,7 +313,8 @@ void Model::SetupMesh(void)
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
 	glEnableVertexAttribArray(2);
-
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+	glEnableVertexAttribArray(3);
 	glBindVertexArray(0);
 }
 
@@ -338,10 +354,38 @@ void Model::GenerateTexCoordsFromPosition(void)
 {
 	std::cout << "🌀 No texCoord found — Generating UVs from position.\n";
 
-	for (size_t i = 0; i < vertices.size(); ++i)
+	for (size_t i = 0; i < mVertices.size(); ++i)
 	{
-		vertices[i].texCoord.x = (vertices[i].position.x + 1.0f) * 0.5f;
-		vertices[i].texCoord.y = (vertices[i].position.y + 1.0f) * 0.5f;
+		mVertices[i].texCoord.x = (mVertices[i].position.x + 1.0f) * 0.5f;
+		mVertices[i].texCoord.y = (mVertices[i].position.y + 1.0f) * 0.5f;
+	}
+}
+
+void Model::ApplyFaceColorsFromIndex(void)
+{
+	int step = 6;
+	float colorLevel[6] = { 1.0f , 0.8f, 0.6f, 0.4f, 0.2f, 0.0f };
+
+	for (size_t i =0; i < mFaces.size(); ++i)
+	{
+		int colorIndex = i % step;
+		float color = colorLevel[colorIndex];
+		mVertices[mFaces[i].vertexIndices[0]].color = { color, color, color};
+		mVertices[mFaces[i].vertexIndices[1]].color = { color, color, color};
+		mVertices[mFaces[i].vertexIndices[2]].color = { color, color, color};
+	}
+}
+
+void Model::UpdateBlend(bool toTexture, float deltaTime)
+{
+	float speed = 2.0f;
+	if (toTexture)
+	{
+		mBlendFactor = std::min(1.0f, mBlendFactor + deltaTime * speed);
+	}
+	else
+	{
+		mBlendFactor = std::max(0.0f, mBlendFactor - deltaTime * speed);
 	}
 }
 
@@ -349,20 +393,21 @@ void Model::GenerateTexCoordsFromPosition(void)
 /* ----------------TEST---------------- */
 void Model::PrintAllVertexInfo()
 {
-	std::vector<Vertex>::const_iterator it = vertices.begin();
-	for (; it != vertices.end(); it++)
+	std::vector<Vertex>::const_iterator it = mVertices.begin();
+	for (; it != mVertices.end(); it++)
 	{
 		std::cout << "-----------------Vertices Info---------------" << std::endl;
 		std::cout << "postiton| x : " << it->position.x << " y : "<< it->position.y << " z : " << it->position.z << std::endl;
 		std::cout << "normal  | x : " << it->normal.x << " y : " << it->normal.y << " z : " <<  it->normal.z <<std::endl;
 		std::cout << "texCoord| x : " << it->texCoord.x << " y : " << it->texCoord.y <<std::endl;
-	}
+		std::cout << "Color   | x : " << it->color.x << " y : " << it->color.y << " z : " << it->color.z << std::endl;
+ 	}
 }
 
 void Model::PrintAllFaceInfo()
 {
-	std::vector<Face>::const_iterator it = faces.begin();
-	for (; it != faces.end(); it++)
+	std::vector<Face>::const_iterator it = mFaces.begin();
+	for (; it != mFaces.end(); it++)
 	{
 		std::cout << "----------------Face Info-----------------" << std::endl;
 		std::cout << "vertexIndces: ";

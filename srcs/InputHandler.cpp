@@ -1,4 +1,6 @@
 #include "InputHandler.hpp"
+#include <csetjmp>
+#define MOVE_SPEED 0.0000001
 
 InputHandler::InputHandler()
 {}
@@ -19,6 +21,11 @@ void InputHandler::Update()
 
 }
 
+float InputHandler::GetScale() const
+{
+	return (scale);
+}
+
 float InputHandler::GetRotX() const
 {
 	return (rotX);
@@ -29,9 +36,25 @@ float InputHandler::GetRotY() const
 	return (rotY);
 }
 
-float InputHandler::GetScale() const
+float	InputHandler::GetVelocityX () const
 {
-	return (scale);
+	return (velocityX);
+}
+
+float	InputHandler::GetVelocityY () const
+{
+	return (velocityY);
+}
+
+float	InputHandler::GetVelocityZ () const
+{
+	return (velocityZ);
+}
+
+
+bool InputHandler::GetUseTexture() const
+{
+	return (useTexture);
 }
 
 /* Private */
@@ -98,6 +121,32 @@ void InputHandler::KeyCallBack(GLFWwindow* window, int key, int scancode, int ac
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			}
 		}
+		if (key == 84)
+		{
+			if (useTexture == false)
+				useTexture = true;
+			else
+				useTexture = false;
+		}
+		if (key == 87) // W
+			velocityZ = -0.1f; // 앞으로 이동
+		if (key == 83) // S
+			velocityZ = 0.1f;  // 뒤로 이동
+		if (key == 65) // A
+			velocityX = -0.1f; // 왼쪽으로 이동
+		if (key == 68) // D
+			velocityX = 0.1f;  // 오른쪽으로 이동
+		if (key == 69) // E
+			velocityY = 0.1f;  // 위로 이동
+		if (key == 81) // Q
+			velocityY = -0.1f; // 아래로 이동
+		std::cout << "Key : " << key << std::endl;
+	}
+	if (action == GLFW_RELEASE)
+	{
+		if (key == 87 || key == 83) velocityZ = 0.0f;
+		if (key == 65 || key == 68) velocityX = 0.0f;
+		if (key == 81 || key == 69) velocityY = 0.0f;
 	}
 }
 

@@ -4,6 +4,7 @@ out vec4 FragColor;
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoord;
+in vec3 VertexColor;
 
 struct Material {
 	vec3 ambient;
@@ -11,12 +12,16 @@ struct Material {
 	vec3 specular;
 	float shininess;
 };
+
 uniform Material material;
-uniform vec4 TimeColor;
 uniform sampler2D texture1;
+uniform float blendFactor;
 
 void main()
 {
-	vec3 result = material.ambient + texture(texture1, TexCoord).rgb * material.diffuse + material.shininess;
-	FragColor = vec4(result, 1.0) + TimeColor;
+	vec3 texColor = texture(texture1, TexCoord).rgb * material.diffuse;
+	vec3 finalColor = mix(VertexColor, texColor, blendFactor);
+
+	vec3 result = material.ambient + finalColor;
+	FragColor = vec4(result, 1.0);
 }
