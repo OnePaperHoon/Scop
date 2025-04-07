@@ -57,6 +57,7 @@ This project is entirely built **without external math or model libraries** (no 
 ---
 
 ## 🛠️ Build
+You need first GLFW Install
 
 ```bash
 make
