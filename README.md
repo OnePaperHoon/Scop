@@ -61,6 +61,8 @@ This project is entirely built **without external math or model libraries** (no 
 ```bash
 make
 ./scop teapot.obj
+or
+./scop
 ```
 ___
 
