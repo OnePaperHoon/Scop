@@ -383,7 +383,7 @@ void Model::GenerateTexCoordsFromPosition(void)
 	{
 		float u = (mOriginalPositions[i].x + 1.0f) * 0.5f;
 		float v = (mOriginalPositions[i].y + 1.0f) * 0.5f;
-		std::cerr << "어디서 터지노" << std::endl;
+
 		switch (mUVRotation)
 		{
 			case UVRotation::None:
