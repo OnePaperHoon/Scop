@@ -11,6 +11,7 @@
 #include "MathUtils.hpp"
 #include "Material.hpp"
 #include "Shader.hpp"
+#include "UVRotation.hpp"
 
 struct Vertex {
 	Vec3 position;
@@ -23,8 +24,8 @@ struct Vertex {
 				texCoord == other.texCoord;
 	}
 };
-struct Face {
 
+struct Face {
 	std::vector<unsigned int> vertexIndices;
 	std::string mtlname;
 };
@@ -42,9 +43,11 @@ class Model
 		void LoadTexture(const std::string& path);
 		void SetScale(float scale);
 		void SetRotation(float rotX, float rotY);
+		void SetPosition(float posX, float posY, float posZ);
 		void SetTranslation(float offsetX, float offsetY, float offsetZ);
+		void SetUVRotation(UVRotation rotation);
 
-		private: // Private Function
+	private: // Private Function
 		void LoadOBJ(const char* filePath);
 		void SetupMesh(void);
 		void NormalizeVertices(std::vector<Vertex>& vertices);
@@ -52,6 +55,7 @@ class Model
 		void GenerateTexCoordsFromPosition(void);
 		void ApplyFaceColorsFromIndex(void);
 		void UpdateBlend(bool toTexture, float deltaTime);
+
 	private: // Variable
 		/**
 		 * @brief
@@ -60,40 +64,43 @@ class Model
 		 * Vec3 Normal
 		 * Vec2 TextureCoord
 		 */
-		std::vector<Vertex> mVertices;
+		std::vector<Vertex> 						mVertices;
 		/**
 		 * @brief
 		 * 현재 3D 모델의 요소 인덱스 정보 (EBO에 사용됨)
 		 */
-		std::vector<unsigned int>	mAllIndices;
-		std::vector<Face>			mFaces;
+		std::vector<unsigned int>					mAllIndices;
+		std::vector<Face>							mFaces;
 		/**
 		 * @brief
 		 * 모델 스케일을 조절하는 비율 값
 		 */
-		float						mScaleFactor;
+		float										mScaleFactor;
 		/**
 		 * @brief
 		 * 모델 회전을 조절하는 값
 		 */
-		float						mRotX, mRotY;
+		float										mRotX, mRotY;
 		/**
 		 * @brief
 		 * 현재 오브젝트의 x, y, z 좌표
 		 */
-		float						mPosX, mPosY, mPosZ;
+		float										mPosX, mPosY, mPosZ;
 		/**
 		 * @brief
 		 * OpenGL 객체 식별자: VAO, VBO, EBO
 		 */
-		GLuint 						mVAO, mVBO, mEBO;
+		GLuint 										mVAO, mVBO, mEBO;
 
 		Shader*										mShaderProgram;		// 현재 오브젝트에 대한 Shader Program ID
 		GLuint										mTextureId;			// 현재 오브젝트에 대한 Texture ID
 		std::unordered_map<std::string, Material>	mMaterials;			// usemtl이 여러개일 경우를 상정하여 Material node_map
 		std::string									mCurrentMaterial;	// LoadOBJ & Draw 에서 currentMaterial 조정
 		bool										mbUseTexture;		// 'T' 키에 대한 텍스쳐 모드 여부
-		float										mBlendFactor;
+		float										mBlendFactor;		// 텍스쳐 모드 변환시 사용할 Factor
+		UVRotation									mUVRotation;		// 텍스쳐 회전에 대한 enum class (감기는 회전 방향이 아닌 이미지 회전)
+		std::vector<Vec3>							mOriginalPositions; // uv 생성시 사용되는 원본 포지션
+
 	private: // TEST PRINT INFO
 		void PrintAllVertexInfo();
 		void PrintAllFaceInfo();

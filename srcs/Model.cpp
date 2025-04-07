@@ -1,7 +1,7 @@
 #include "MathUtils.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "Model.hpp"
-#include "library/stb_image.h"
+#include "../library/stb_image.h"
 #include <OpenGL/gl.h>
 #include <fstream>
 #include <iostream>
@@ -16,6 +16,7 @@ Model::Model(const char* filePath, Shader* shader)
 , mPosX(0.0f), mPosY(0.0f), mPosZ(0.0f)
 , mbUseTexture(false)
 , mBlendFactor(0.0f)
+, mUVRotation(UVRotation::None)
 {
 	LoadOBJ(filePath);
 	SetupMesh();
@@ -149,11 +150,31 @@ void Model::SetRotation(float rotX, float rotY)
 	this->mRotY = rotY;
 }
 
+void Model::SetPosition(float PosX, float PosY, float PosZ)
+{
+	mPosX = PosX;
+	mPosY = PosY;
+	mPosZ = PosZ;
+}
+
 void Model::SetTranslation(float offsetX, float offsetY, float offsetZ)
 {
 	mPosX += offsetX;
 	mPosY += offsetY;
 	mPosZ += offsetZ;
+}
+
+void Model::SetUVRotation(UVRotation rotation)
+{
+	if (mUVRotation != rotation)
+	{
+		mUVRotation = rotation;
+		GenerateTexCoordsFromPosition();
+
+		glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, mVertices.size() * sizeof(Vertex), mVertices.data());
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 }
 
 // Private
@@ -268,8 +289,11 @@ void Model::LoadOBJ(const char* filePath)
 				mFaces.push_back(f1);
 				mFaces.push_back(f2);
 			}
+
 		}
 	}
+	for (const auto& v : mVertices)
+		mOriginalPositions.push_back(v.position);
 	file.close();
 	if (!hasTexCoord)
 	{
@@ -354,10 +378,38 @@ void Model::GenerateTexCoordsFromPosition(void)
 {
 	std::cout << "🌀 No texCoord found — Generating UVs from position.\n";
 
-	for (size_t i = 0; i < mVertices.size(); ++i)
+	size_t count = std::min(mOriginalPositions.size(), mVertices.size());
+	for (size_t i = 0; i < count; ++i)
 	{
-		mVertices[i].texCoord.x = (mVertices[i].position.x + 1.0f) * 0.5f;
-		mVertices[i].texCoord.y = (mVertices[i].position.y + 1.0f) * 0.5f;
+		float u = (mOriginalPositions[i].x + 1.0f) * 0.5f;
+		float v = (mOriginalPositions[i].y + 1.0f) * 0.5f;
+		std::cerr << "어디서 터지노" << std::endl;
+		switch (mUVRotation)
+		{
+			case UVRotation::None:
+				break;
+			case UVRotation::FlipVertical:
+				v = 1.0f - v;
+				break;
+			case UVRotation::FlipHorizontal:
+				u = 1.0f - u;
+				break;
+			case UVRotation::Rotate90:
+			{
+				float temp = u;
+				u = v;
+				v = 1.0f - temp;
+				break;
+			}
+			case UVRotation::Rotate180:
+				u = 1.0f - u;
+				v = 1.0f - v;
+				break;
+			default:
+				break;
+		}
+		mVertices[i].texCoord.x = u;
+		mVertices[i].texCoord.y = v;
 	}
 }
 

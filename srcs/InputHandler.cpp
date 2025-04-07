@@ -1,4 +1,5 @@
 #include "InputHandler.hpp"
+#include "UVRotation.hpp"
 #include <csetjmp>
 #define MOVE_SPEED 0.0000001
 
@@ -19,6 +20,11 @@ void InputHandler::RegisterCallbacks(GLFWwindow* window)
 void InputHandler::Update()
 {
 
+}
+
+void InputHandler::SetResetState(bool value)
+{
+	resetPosition = value;
 }
 
 float InputHandler::GetScale() const
@@ -51,10 +57,19 @@ float	InputHandler::GetVelocityZ () const
 	return (velocityZ);
 }
 
-
 bool InputHandler::GetUseTexture() const
 {
 	return (useTexture);
+}
+
+bool InputHandler::GetResetState() const
+{
+	return (resetPosition);
+}
+
+UVRotation InputHandler::GetRotationMode() const
+{
+	return (RotationMode);
 }
 
 /* Private */
@@ -140,6 +155,52 @@ void InputHandler::KeyCallBack(GLFWwindow* window, int key, int scancode, int ac
 			velocityY = 0.1f;  // 위로 이동
 		if (key == 81) // Q
 			velocityY = -0.1f; // 아래로 이동
+		if (key == 82) // R
+			resetPosition = true;
+		if (key == 262)	// Right
+		{
+			switch (RotationMode)
+			{
+				case UVRotation::None:
+					RotationMode = UVRotation::Rotate90;
+					break;
+				case UVRotation::Rotate90:
+					RotationMode = UVRotation::Rotate180;
+					break;
+				case UVRotation::Rotate180:
+					RotationMode = UVRotation::None;
+					break;
+				default:
+					RotationMode = UVRotation::None;
+					break;
+			}
+		}
+		else if (key == 263) // Left
+		{
+			switch (RotationMode)
+			{
+				case UVRotation::None:
+					RotationMode = UVRotation::Rotate180;
+					break;
+				case UVRotation::Rotate180:
+					RotationMode = UVRotation::Rotate90;
+					break;
+				case UVRotation::Rotate90:
+					RotationMode = UVRotation::None;
+					break;
+				default:
+					RotationMode = UVRotation::None;
+					break;
+			}
+		}
+		else if (key == 264) // Down
+		{
+			RotationMode = UVRotation::FlipVertical;
+		}
+		else if (key == 265) // Up
+		{
+			RotationMode = UVRotation::FlipHorizontal;
+		}
 		std::cout << "Key : " << key << std::endl;
 	}
 	if (action == GLFW_RELEASE)
@@ -149,4 +210,3 @@ void InputHandler::KeyCallBack(GLFWwindow* window, int key, int scancode, int ac
 		if (key == 81 || key == 69) velocityY = 0.0f;
 	}
 }
-
