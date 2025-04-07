@@ -60,7 +60,7 @@ This project is entirely built **without external math or model libraries** (no 
 
 ```bash
 make
-./scop models/teapot.obj
+./scop teapot.obj
 ```
 ___
 
@@ -71,7 +71,7 @@ ___
 ├── README.md
 ├── library
 │   └── stb_image.h
-├── resources
+├── resources <- add Your obj file
 │   ├── 42.mtl
 │   ├── 42.obj
 │   ├── sample.png

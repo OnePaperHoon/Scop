@@ -50,7 +50,7 @@ GLFWwindow* CreateWindow(int width, int height, std::string title)
 	return (window);
 }
 
-int main(void)
+int main(int ac, char **av)
 {
 	InputHandler InputHandler;
 
@@ -75,7 +75,12 @@ int main(void)
 	Shader defaultShader (
 		"srcs/shaders/shader_vert.glsl", // Vertex Shader
 		"srcs/shaders/shader_frag.glsl"); // fragment Shader
-	Model teapot("resources/teapot2.obj", &defaultShader);
+
+	Model* teapot;
+	if (ac == 1)
+		teapot = new Model("resources/teapot2.obj", &defaultShader);
+	if (ac == 2)
+		teapot = new Model(("resources/" + std::string(av[1])).c_str(), &defaultShader);
 	Model teapot2("resources/teapot2.obj", &defaultShader);
 	teapot2.SetTranslation(-1, 1, -2);
 
@@ -89,21 +94,22 @@ int main(void)
 
 		if (InputHandler.GetResetState()) // R (Reset Positon)
 		{
-			teapot.SetPosition(0.0f, 0.0f, 0.0f);
+			teapot->SetPosition(0.0f, 0.0f, 0.0f);
 			InputHandler.SetResetState(false);
 		}
 
-		teapot.SetUVRotation(InputHandler.GetRotationMode());
-		teapot.SetScale(InputHandler.GetScale());
-		teapot.SetRotation(InputHandler.GetRotX(), InputHandler.GetRotY());
-		teapot.SetTranslation(InputHandler.GetVelocityX(), InputHandler.GetVelocityY(), InputHandler.GetVelocityZ());
-		teapot.UseTexture(InputHandler.GetUseTexture());
-		teapot.Draw();
+		teapot->SetUVRotation(InputHandler.GetRotationMode());
+		teapot->SetScale(InputHandler.GetScale());
+		teapot->SetRotation(InputHandler.GetRotX(), InputHandler.GetRotY());
+		teapot->SetTranslation(InputHandler.GetVelocityX(), InputHandler.GetVelocityY(), InputHandler.GetVelocityZ());
+		teapot->UseTexture(InputHandler.GetUseTexture());
+		teapot->Draw();
 
 		teapot2.Draw();
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 	glfwTerminate();
+	delete teapot;
 	return (0);
 }
