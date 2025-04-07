@@ -75,7 +75,7 @@ int main(void)
 	Shader defaultShader (
 		"srcs/shaders/shader_vert.glsl", // Vertex Shader
 		"srcs/shaders/shader_frag.glsl"); // fragment Shader
-	Model teapot("resources/42.obj", &defaultShader);
+	Model teapot("resources/teapot2.obj", &defaultShader);
 	Model teapot2("resources/teapot2.obj", &defaultShader);
 	teapot2.SetTranslation(-1, 1, -2);
 

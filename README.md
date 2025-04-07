@@ -4,6 +4,9 @@ A minimal OpenGL-based 3D object viewer written in C++
 
 ---
 
+## Demo
+![Scop Demo](/Demo/Scop.gif)
+
 ## 📦 About
 
 SCOP is a small 3D rendering application that loads `.obj` files, renders them using OpenGL, and allows camera movement, object manipulation, and toggling between texture and color modes.
@@ -61,4 +64,33 @@ make
 ```
 ___
 
+
 # 📁 Project Structure
+```
+├── Makefile
+├── README.md
+├── library
+│   └── stb_image.h
+├── resources
+│   ├── 42.mtl
+│   ├── 42.obj
+│   ├── sample.png
+│   ├── teapot.obj
+│   ├── teapot2.mtl
+│   └── teapot2.obj
+└── srcs
+    ├── InputHandler.cpp
+    ├── InputHandler.hpp
+    ├── Material.cpp
+    ├── Material.hpp
+    ├── MathUtils.hpp
+    ├── Model.cpp
+    ├── Model.hpp
+    ├── Shader.cpp
+    ├── Shader.hpp
+    ├── UVRotation.hpp
+    ├── main.cpp
+    └── shaders
+        ├── shader_frag.glsl
+        └── shader_vert.glsl
+```
